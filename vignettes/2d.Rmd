@@ -1,0 +1,105 @@
+---
+title: "HMC 2-d example"
+author: "Andrew Zammit Mangion"
+date: "23/01/2015"
+output: html_document
+---
+
+### A bivariate toy problem
+
+In this example we will consider the toy problem of Neal (2011) in Section 5.3.3 and will be quoting from this work extensively throughout.
+
+For Hamiltonian Monte Carlo (HMC), we are required to write down a density of the form 
+
+$$
+p(q,p) = \frac{1}{Z}\exp\left(\frac{-U(q)}{T}\right)\exp\left(\frac{-K(p)}{T}\right)
+$$
+
+where $T$ is the system `temperature', $Z$ is the normalising constant, $U(q)$ is the potential energy (a function of the position $q$) and $K(p)$ is the kinetic energy (a function of the momentum $p$). Note that in this case, the product form is a result of the Hamiltonian being decomposed as a sum of the potential energy and the kinetic energy. 
+
+The position $q$ takes the role of the parameters and $U(q)$ the role of the negative log probability density function. Hence, if $L(q | Z)$ is the likelihood and $\pi(q)$ is the prior, we have that
+$$
+U(q) = -\log(\pi(q)L(q|Z))
+$$
+
+In this toy problem we will take $T=1$, $U(q) = q'\Sigma^{-1}q/2$ where 
+$$\Sigma = \begin{bmatrix} 1 & 0.98 \\ 0.98 & 1 \end{bmatrix}$$ 
+and $K(p) = p'p/2$, that is, we assume that $\exp\left(-K(p)\right)$ is a bivariate normal distribution with independent components of unit variance. We can define the model as follows:
+
+
+```{r}
+library(hmc)
+### Define model
+S <- matrix(c(1,-0.98,-0.98,1),2,2)
+n <- nrow(S)
+Q <- chol2inv(chol(S))
+cholQ <- chol(Q)
+U <- function(q) 0.5 * crossprod(cholQ %*% q)
+dUdq <- function(q) Q %*% q
+M <- diag(1,n)
+```
+
+We will now set up the HMC sampler. We set $\epsilon$ by making it equal to the square-root of the smallest eigenvalue of the covariance matrix. This value is is the standard deviation in the "most constrained" direction.  We then set $L$ equals to the square-root of the largest eigenvalue divided by $\epsilon$. This value is an indication of the number of step sizes needed to traverse the "least constrained" direction. The sampler is set up to take an $\epsilon$-generator, that is, a function which when called returns a value for $\epsilon$. This allows for random step sizes as we demonstrate later on in this tutorial.
+
+```{r}
+### Sampler parameters
+E <- eigen(S)
+eps_gen <- function() round(min(E$values),2)
+L = as.integer(max(E$values)/eps_gen())
+print(paste0("eps = ",eps_gen(),". L = ",L))
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = M,eps_gen = eps_gen,L = L)
+```
+
+The function `hmc_sampler` returns a sampler, which we then can insert in a loop as usual. In this case we will tak $N = 1000$ samples and set the initial sample $q^{(0)} = 0$. We then plot the samples.
+
+```{r}
+### Now sample
+N <- 1000
+q <- matrix(0,n,N)
+for(i in 2:N) q[,i] <- sampler(q = q[,(i-1)])
+plot(t(q),ylim = c(-4,4),xlim=c(-4,4))
+```
+
+This is comparable to directly sampling from this distribution
+
+```{r}
+samps <- t(chol(S)) %*% matrix(rnorm(N*n),n,N)
+plot(t(samps),ylim = c(-4,4),xlim=c(-4,4))
+```
+
+The value of $L$ is quite large in this case, due to the large disparity between the least constrained and most constrained direction. This can be improved by approximate pre-whitening, which we can do whenever we have a suitable approximation to the covariance matrix of interest (for example following a Laplace approximaion). We can pre-whiten by defining a new position variable $q' = L^{-1}q$, where $L$ is the lower Cholesky factor of the covariance matrix $\Sigma$. We can keep the same kinetic energy function, but the new potential energy function now works with the pre-whitened variables, and we have that $U'(q') = U(Lq')$. Alternatively, as shown in Neal (2011), Section 5.4.1, we can simply set the matrix $M$ which appears in the kinetic energy function to be the inverse of the covariance matrix, that is, $\Sigma^{-1}$. If we have correctly pre-whitened, then we can set $\epsilon = 1$ since we are not constrained in any direction, and also $L = 1$, which reduces HMC to a Langevin method.
+
+
+```{r}
+### Sampler parameters
+eps_gen <- function() 1
+L <- 1L
+print(paste0("eps = ",eps_gen(),". L = ",L))
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen,L = L)
+```
+
+Since every sample now only requires one  step the MC method is now probably a couple of orders of magnitude faster than the sampler which does not employ a transformation. 
+
+```{r}
+### Now sample
+N <- 1000
+q <- matrix(0,n,N)
+for(i in 2:N) q[,i] <- sampler(q = q[,(i-1)])
+plot(t(q),type="p",ylim = c(-4,4),xlim=c(-4,4))
+```
+
+Up to now we have used a function which returns a constant for $\epsilon$. Although not needed for this simple toy study, we can jitter $\epsilon$ if needed -- this is a good idea when different regions of the probability space have markedly different gradients, and hence would benefit from different step sizes for exploration. Jittering $\epsilon$ reduces the possibility of always rejecting proposals in these markedly different regions of the space.
+
+```{r}
+eps_gen <- function() runif(n=1,min=0.8,max = 1.2)
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen,L = L)
+q <- matrix(0,n,N)
+for(i in 2:N) q[,i] <- sampler(q = q[,(i-1)])
+plot(t(q),type="p",ylim = c(-4,4),xlim=c(-4,4))
+```
+
+As expected, for this problem we do not notice any change in performane due to jittering.
+
+### References
+
+Neal, R. (2011). MCMC using Hamiltonian dynamics. Handbook of Markov Chain Monte Carlo, Chapman & Hall/CRC.
