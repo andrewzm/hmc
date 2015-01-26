@@ -5,9 +5,11 @@ date: "23/01/2015"
 output: html_document
 ---
 
-### A bivariate toy problem
+### Introduction
 
-In this example we will consider the toy problem of Neal (2011) in Section 5.3.3 and will be quoting from this work extensively throughout.
+In this vignette we will consider the exposition and toy problem of Neal (2011) in Section 5.3.3, and will be quoting from this work extensively throughout.
+
+Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC) method in which proposals are made efficiently by using the gradient of the density of interest. The gradient information allows us to propose a new state by simulating from Hamilton's equations. All that requires for the proposal is the current position (current sample) and a momentum vector which is assumed to be independent from the current sample.
 
 For Hamiltonian Monte Carlo (HMC), we are required to write down a density of the form 
 
@@ -21,10 +23,13 @@ The position $q$ takes the role of the parameters and $U(q)$ the role of the neg
 $$
 U(q) = -\log(\pi(q)L(q|Z))
 $$
+One we have defined a function for the kinetic energy, and hence have also defined the Hamiltonian, we can simulated from it using the leapfrog method. The leaprfrog method, like any other discretisation scheme for approximately solving a continuous-time equation, requires specification of the step-size $\epsilon$. We can also choose how long a trajectory we wish to simulate through the number of leapfrog steps $L$. These parameters need to be carefully tuned with HMC specifically for each problem.
 
-In this toy problem we will take $T=1$, $U(q) = q'\Sigma^{-1}q/2$ where 
+### A bivariate toy problem
+
+Consider the density defined above with $T=1$, $U(q) = q'\Sigma^{-1}q/2$ where 
 $$\Sigma = \begin{bmatrix} 1 & 0.98 \\ 0.98 & 1 \end{bmatrix}$$ 
-and $K(p) = p'p/2$, that is, we assume that $\exp\left(-K(p)\right)$ is a bivariate normal distribution with independent components of unit variance. We can define the model as follows:
+and $K(p) = p'p/2$. The latter implies that $\exp\left(-K(p)\right)$ is a bivariate normal distribution with independent components of unit variance.  The model can then be set-up in $R$ as follows:
 
 
 ```{r}
@@ -39,7 +44,7 @@ dUdq <- function(q) Q %*% q
 M <- diag(1,n)
 ```
 
-We will now set up the HMC sampler. We set $\epsilon$ by making it equal to the square-root of the smallest eigenvalue of the covariance matrix. This value is is the standard deviation in the "most constrained" direction.  We then set $L$ equals to the square-root of the largest eigenvalue divided by $\epsilon$. This value is an indication of the number of step sizes needed to traverse the "least constrained" direction. The sampler is set up to take an $\epsilon$-generator, that is, a function which when called returns a value for $\epsilon$. This allows for random step sizes as we demonstrate later on in this tutorial.
+We will now set up the HMC sampler. As discussed above, there are two crucial parameters which need to be set by the user, $\epsilons$ and $L$. We set $\epsilon$ equal to the square-root of the smallest eigenvalue of the covariance matrix, as this value is is the standard deviation in the "most constrained" direction.  We then set $L$ equals to the square-root of the largest eigenvalue divided by $\epsilon$. This value is an indication of the number of step sizes needed to traverse the "least constrained" direction. The sampler is set up to take an $\epsilon$-generator, that is, a function which when called returns a value for $\epsilon$. This allows for random step sizes as we demonstrate later on in this tutorial.
 
 ```{r}
 ### Sampler parameters
@@ -50,7 +55,7 @@ print(paste0("eps = ",eps_gen(),". L = ",L))
 sampler <- hmc_sampler(U = U,dUdq = dUdq, M = M,eps_gen = eps_gen,L = L)
 ```
 
-The function `hmc_sampler` returns a sampler, which we then can insert in a loop as usual. In this case we will tak $N = 1000$ samples and set the initial sample $q^{(0)} = 0$. We then plot the samples.
+The function `hmc_sampler` returns a sampler, which we then can insert in a loop as usual. In this case we will take $N = 1000$ samples and set the initial sample $q^{(0)} = 0$. We then plot the samples.
 
 ```{r}
 ### Now sample
