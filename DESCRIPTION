@@ -1,9 +1,11 @@
 Package: hmc
 Type: Package
-Title: What the package does (short line)
-Version: 1.0
+Title: Hamiltonian Markov chain Monte Carlo
+Version: 0.1.0
 Date: 2015-01-23
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Author: Andrew Zammit-Mangion
+Maintainer: Andrew Zammit-Mangion <andrewzm@gmail.com>
+Description: Hamiltonian Markov chain Monte Carlo sampler based on the work of Neal, R. (2011). MCMC using Hamiltonian dynamics. Handbook of Markov Chain Monte Carlo, Chapman & Hall/CRC.
+URL: http://github.com/andrewzm/hmc
+BugReports: http://github.com/andrewzm/hmc/issues
+License: GPL (>=2)
