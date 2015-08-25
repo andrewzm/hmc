@@ -33,7 +33,8 @@ and $K(p) = p'p/2$. The latter implies that $\exp\left(-K(p)\right)$ is a bivari
 
 
 ```{r}
-library(hmc)
+library(devtools)
+load_all()
 ### Define model
 S <- matrix(c(1,-0.98,-0.98,1),2,2)
 n <- nrow(S)
@@ -77,10 +78,9 @@ The value of $L$ is quite large in this case, due to the large disparity between
 
 ```{r}
 ### Sampler parameters
-eps_gen <- function() 1
-L <- 1L
+eps_gen2 <- function() 1
 print(paste0("eps = ",eps_gen(),". L = ",L))
-sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen,L = L)
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen2,L = 1L)
 ```
 
 Since every sample now only requires one  step the MC method is now probably a couple of orders of magnitude faster than the sampler which does not employ a transformation. 
@@ -96,14 +96,29 @@ plot(t(q),type="p",ylim = c(-4,4),xlim=c(-4,4))
 Up to now we have used a function which returns a constant for $\epsilon$. Although not needed for this simple toy study, we can jitter $\epsilon$ if needed -- this is a good idea when different regions of the probability space have markedly different gradients, and hence would benefit from different step sizes for exploration. Jittering $\epsilon$ reduces the possibility of always rejecting proposals in these markedly different regions of the space.
 
 ```{r}
-eps_gen <- function() runif(n=1,min=0.8,max = 1.2)
-sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen,L = L)
+eps_gen3 <- function() runif(n=1,min=0.8,max = 1.2)
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = solve(S),eps_gen = eps_gen3,L = L)
 q <- matrix(0,n,N)
 for(i in 2:N) q[,i] <- sampler(q = q[,(i-1)])
 plot(t(q),type="p",ylim = c(-4,4),xlim=c(-4,4))
 ```
 
 As expected, for this problem we do not notice any change in performane due to jittering.
+
+### Adding constraints
+
+Now we're going to consider the problem of sampling from the distribution under the constraint that both $q_1$ and $q_2$ are nonnegative. We use the 'billards' approach to cater for this -- if a particle crosses the zero threshold, it is bounced back in the leapfrog step. That is, it remains where it is with its momentum now reversed.
+
+To introduce constraints, we only need to specify two vectors: `lower` and `upper`. In the following example we constrain $q_1 < 0$ and $q_2 > 0$, thus forcing the particles to lie in the upper-left quadrant in probability space. Since we can only pass vectors of constraints, we need to set arbitrarily large values for the 'dummy' constraints:
+
+```{r}
+sampler <- hmc_sampler(U = U,dUdq = dUdq, M = M,eps_gen = eps_gen,L = L,lower=c(-1e10,0),upper=c(0,1e10))
+N <- 1000
+q <- matrix(0,n,N)
+for(i in 2:N) q[,i] <- sampler(q = q[,(i-1)])
+plot(t(q),type="p",ylim = c(-4,4),xlim=c(-4,4))
+```
+
 
 ### References
 
